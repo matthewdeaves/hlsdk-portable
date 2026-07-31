@@ -19,6 +19,11 @@
 #include "triangleapi.h"
 #include "byteswap.h"
 
+// oldmac: ULittleToHost = unaligned read + big-endian swap (see scripts/patch-hlsdk-studio-endian.py).
+// Upstream reads these through Unaligned(), which fixes alignment but does NOT
+// byteswap, so studio animation values are garbage on PPC.
+
+
 #include <stdio.h>
 #include <string.h>
 
@@ -214,30 +219,30 @@ void CStudioModelRenderer::StudioCalcBoneQuaterion( int frame, float s, mstudiob
 			// Bah, missing blend!
 			if( panimvalue->num.valid > k )
 			{
-				angle1[j] = Unaligned( panimvalue[k + 1].value );
+				angle1[j] = ULittleToHost( panimvalue[k + 1].value );
 
 				if( panimvalue->num.valid > k + 1 )
 				{
-					angle2[j] = Unaligned( panimvalue[k + 2].value );
+					angle2[j] = ULittleToHost( panimvalue[k + 2].value );
 				}
 				else
 				{
 					if( panimvalue->num.total > k + 1 )
 						angle2[j] = angle1[j];
 					else
-						angle2[j] = Unaligned( panimvalue[panimvalue->num.valid + 2].value );
+						angle2[j] = ULittleToHost( panimvalue[panimvalue->num.valid + 2].value );
 				}
 			}
 			else
 			{
-				angle1[j] = Unaligned( panimvalue[panimvalue->num.valid].value );
+				angle1[j] = ULittleToHost( panimvalue[panimvalue->num.valid].value );
 				if( panimvalue->num.total > k + 1 )
 				{
 					angle2[j] = angle1[j];
 				}
 				else
 				{
-					angle2[j] = Unaligned( panimvalue[panimvalue->num.valid + 2].value );
+					angle2[j] = ULittleToHost( panimvalue[panimvalue->num.valid + 2].value );
 				}
 			}
 			angle1[j] = pbone->value[j+3] + angle1[j] * pbone->scale[j + 3];
@@ -304,11 +309,11 @@ void CStudioModelRenderer::StudioCalcBonePosition( int frame, float s, mstudiobo
 				// and there's more data in the span
 				if( panimvalue->num.valid > k + 1 )
 				{
-					pos[j] += ( Unaligned( panimvalue[k + 1].value ) * ( 1.0f - s ) + s * Unaligned( panimvalue[k + 2].value ) ) * pbone->scale[j];
+					pos[j] += ( ULittleToHost( panimvalue[k + 1].value ) * ( 1.0f - s ) + s * ULittleToHost( panimvalue[k + 2].value ) ) * pbone->scale[j];
 				}
 				else
 				{
-					pos[j] += Unaligned( panimvalue[k + 1].value ) * pbone->scale[j];
+					pos[j] += ULittleToHost( panimvalue[k + 1].value ) * pbone->scale[j];
 				}
 			}
 			else
@@ -316,11 +321,11 @@ void CStudioModelRenderer::StudioCalcBonePosition( int frame, float s, mstudiobo
 				// are we at the end of the repeating values section and there's another section with data?
 				if( panimvalue->num.total <= k + 1 )
 				{
-					pos[j] += ( Unaligned( panimvalue[panimvalue->num.valid].value ) * ( 1.0f - s ) + s * Unaligned( panimvalue[panimvalue->num.valid + 2].value ) ) * pbone->scale[j];
+					pos[j] += ( ULittleToHost( panimvalue[panimvalue->num.valid].value ) * ( 1.0f - s ) + s * ULittleToHost( panimvalue[panimvalue->num.valid + 2].value ) ) * pbone->scale[j];
 				}
 				else
 				{
-					pos[j] += Unaligned( panimvalue[panimvalue->num.valid].value ) * pbone->scale[j];
+					pos[j] += ULittleToHost( panimvalue[panimvalue->num.valid].value ) * pbone->scale[j];
 				}
 			}
 		}
@@ -407,6 +412,37 @@ mstudioanim_t *CStudioModelRenderer::StudioGetAnim( model_t *m_pSubModel, mstudi
 	{
 		gEngfuncs.Con_DPrintf("loading %s\n", pseqgroup->name );
 		IEngineStudio.LoadCacheFile( pseqgroup->name, (struct cache_user_s *)&paSequences[pseqdesc->seqgroup] );
+
+		// oldmac: swap this seqgroup's anim offsets (see scripts/patch-hlsdk-studio-endian.py).
+		// LoadCacheFile is a raw read: nothing in it byteswaps. The engine swaps
+		// seqgroup 0 in R_StudioLoadHeader and external groups in its OWN
+		// R_StudioGetAnim, but the client never calls that - it has this copy. So
+		// these offsets are still little-endian, and the pointer arithmetic in
+		// StudioCalcBonePosition walks off the model and faults.
+		// The Cache_Check above means this runs exactly once per seqgroup.
+#ifdef XASH_BIG_ENDIAN
+		{
+			mstudioseqdesc_t *pseqdesc2 = (mstudioseqdesc_t *)((byte *)m_pStudioHeader + m_pStudioHeader->seqindex);
+
+			for( int i = 0; i < m_pStudioHeader->numseq; i++ )
+			{
+				if( pseqdesc2[i].seqgroup != pseqdesc->seqgroup )
+					continue;
+
+				mstudioanim_t *panim = (mstudioanim_t *)((byte *)paSequences[pseqdesc->seqgroup].data + pseqdesc2[i].animindex);
+
+				for( int j = 0; j < pseqdesc2[i].numblends; j++ )
+				{
+					for( int k = 0; k < m_pStudioHeader->numbones; k++ )
+					{
+						for( int l = 0; l < 6; l++ )
+							LittleToHostSW( panim->offset[l] );
+						panim++;
+					}
+				}
+			}
+		}
+#endif
 	}
 
 	return (mstudioanim_t *)( (byte *)paSequences[pseqdesc->seqgroup].data + pseqdesc->animindex );
