@@ -118,7 +118,14 @@ float READ_FLOAT( void )
 	dat.b[3] = gpBuf[giRead + 3];
 	giRead += 4;
 
-	//dat.l = LittleLong( dat.l );
+	// oldmac: wire floats are little-endian and this swap shipped commented
+	// out, so READ_FLOAT returned a byte-reversed float on PowerPC. Rebuild the
+	// value from the four wire bytes, same shape as READ_LONG above; that is a
+	// no-op on little-endian and needs no include.
+	// giRead has ALREADY advanced by 4 here, so this must read dat.b[], NOT
+	// gpBuf[giRead] - that would pick up the next four bytes on the wire.
+	dat.l = (int)( (unsigned int)dat.b[0] | ( (unsigned int)dat.b[1] << 8 )
+	             | ( (unsigned int)dat.b[2] << 16 ) | ( (unsigned int)dat.b[3] << 24 ) );
 
 	return dat.f;
 }
