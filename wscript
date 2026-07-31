@@ -122,6 +122,12 @@ def configure(conf):
 	cflags, linkflags = conf.get_optimization_flags()
 	cxxflags = list(cflags) # optimization flags are common between C and C++ but we need a copy
 
+	# oldmac: Apple ld (ld64) has no GNU '--no-undefined'; it's only added for the gcc
+	# path (our PowerPC gcc cross-build). GoldSrc game dylibs resolve engine symbols
+	# at load via the function-pointer handoff, so undefined-symbol checking isn't needed.
+	if conf.env.DEST_OS == 'darwin' and '-Wl,--no-undefined' in linkflags:
+		linkflags.remove('-Wl,--no-undefined')
+
 	# on the Switch, allow undefined symbols by default, which is needed for libsolder to work
 	# we'll specifically disallow them for the engine executable
 	# additionally, shared libs are linked without standard libs, we'll add those back in the engine wscript
