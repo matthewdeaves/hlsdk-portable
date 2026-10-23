@@ -143,6 +143,10 @@ TYPEDESCRIPTION	CBasePlayer::m_playerSaveData[] =
 	//DEFINE_ARRAY( CBasePlayer, m_rgAmmoLast, FIELD_INTEGER, MAX_AMMO_SLOTS ), // Don't need to restore
 	//DEFINE_FIELD( CBasePlayer, m_fOnTarget, FIELD_BOOLEAN ), // Don't need to restore
 	//DEFINE_FIELD( CBasePlayer, m_nCustomSprayFrames, FIELD_INTEGER ), // Don't need to restore
+	// oldmac: without these the recoil state resets on every load, so the
+	// decay fixed above would still not survive a save/restore.
+	DEFINE_FIELD( CBasePlayer, m_flBulletSpreadCoefficient, FIELD_FLOAT ),
+	DEFINE_FIELD( CBasePlayer, m_flNextBulletSpreadRandTime, FIELD_TIME ),
 };	
 
 int giPrecacheGrunt = 0;
@@ -2736,9 +2740,12 @@ pt_end:
 
 	if( pev->flags & FL_DUCKING )
 	{
-		if( gpGlobals->frametime > m_flNextBulletSpreadRandTime + 0.44f )
+		// oldmac: gpGlobals->time, not frametime. frametime is ~0.016 at 60fps,
+		// so this test was 0.016 > 0.456 and false forever: recoil recovery never
+		// ran and pistol accuracy degraded permanently after the first shot.
+		if( gpGlobals->time > m_flNextBulletSpreadRandTime + 0.44f )
 		{
-			m_flNextBulletSpreadRandTime = gpGlobals->frametime;
+			m_flNextBulletSpreadRandTime = gpGlobals->time;
 			m_flBulletSpreadCoefficient -= 0.0025f;
 			if( !( m_afButtonPressed | m_afButtonReleased ) )
 				m_flBulletSpreadCoefficient -= 0.015f;
@@ -2748,17 +2755,17 @@ pt_end:
 	{                       
 		if( pev->button & IN_JUMP )
 		{
-			if( gpGlobals->frametime > m_flNextBulletSpreadRandTime + 0.6f )
+			if( gpGlobals->time > m_flNextBulletSpreadRandTime + 0.6f )
 			{
-				m_flNextBulletSpreadRandTime = gpGlobals->frametime;
+				m_flNextBulletSpreadRandTime = gpGlobals->time;
 				m_flBulletSpreadCoefficient -= 0.0015f;
 				if( !( m_afButtonPressed | m_afButtonReleased ) )
 					m_flBulletSpreadCoefficient -= 0.004f;
 			}
 		}
-		else if( gpGlobals->frametime > m_flNextBulletSpreadRandTime + 0.47f )
+		else if( gpGlobals->time > m_flNextBulletSpreadRandTime + 0.47f )
 		{
-			m_flNextBulletSpreadRandTime = gpGlobals->frametime;
+			m_flNextBulletSpreadRandTime = gpGlobals->time;
 			m_flBulletSpreadCoefficient -= 0.001f;
 			if( !( m_afButtonPressed | m_afButtonReleased ) )
 				m_flBulletSpreadCoefficient -= 0.012f;

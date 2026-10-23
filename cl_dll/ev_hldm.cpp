@@ -467,7 +467,9 @@ void EV_HLDM_SmokePuff( pmtrace_t *pTrace, float *vecSrc, float *vecEnd )
 
 			VectorAngles( pTrace->plane.normal, angles );
 
-			AngleVectors( angles, forward, up, right );
+			// oldmac: AngleVectors is (angles, forward, right, up), so the smoke
+			// puff velocity was using up where it wanted right.
+			AngleVectors( angles, forward, right, up );
 			forward.z = -forward.z;
 
 			// get sprite index
