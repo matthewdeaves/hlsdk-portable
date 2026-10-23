@@ -245,7 +245,10 @@ void LinkUserMessages( void )
 
 	gmsgNightvision = REG_USER_MSG( "Nightvision", 1 );
 
-	gmsgCTFMsgs = REG_USER_MSG( "CTFMsg", 1 );
+	// oldmac: variable length. Every send site writes a byte AND a string, so
+	// registering it as fixed size 1 made FWGS drop the message and log an
+	// error on every CTF flag event.
+	gmsgCTFMsgs = REG_USER_MSG( "CTFMsg", -1 );
 	gmsgFlagStatus = REG_USER_MSG( "FlagStatus", 5 );
 	gmsgRuneStatus = REG_USER_MSG( "RuneStatus", 1 );
 	gmsgFlagCarrier = REG_USER_MSG( "FlagCarrier", 2 );
