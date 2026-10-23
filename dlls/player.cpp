@@ -1054,6 +1054,15 @@ void CBasePlayer::PlayerDeathThink( void )
 	pev->button = 0;
 	m_flRespawnTimer = 0;
 
+	// oldmac: this is the MOTD hold, not a corpse. Spawn() parks a first-time
+	// player at DEAD_RESPAWNABLE until they dismiss the MOTD, and PreThink
+	// cannot tell that state from a dead one. Without this, respawn() below
+	// re-enters the hold and the next frame with a button down throws the
+	// player to another random spawn point, and the next, and the next. See
+	// issue #32.
+	if( !m_bHadFirstSpawn && g_bHaveMOTD )
+		m_bHadFirstSpawn = true;
+
 	//ALERT( at_console, "Respawn\n" );
 
 	respawn( pev, !( m_afPhysicsFlags & PFLAG_OBSERVER ) );// don't copy a corpse if we're in deathcam.

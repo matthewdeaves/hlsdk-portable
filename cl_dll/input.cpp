@@ -83,7 +83,13 @@ extern "C"
 {
 	int g_onground = false;
 	int g_inwater = false;
-	int g_walking = true; // Movetype == MOVETYPE_WALK. Filters out noclip, being on ladder, etc.
+	// oldmac: nothing has established the movetype yet, and guessing WALK
+	// here is the guess that breaks. With g_onground and g_inwater both
+	// starting false too, the autojump test below reads as airborne and
+	// strips IN_JUMP from every command, so jump does nothing at all until
+	// the client's PM_Move writes these, and forever if prediction is off.
+	// Guessing false only costs the autojump release. Issue #32.
+	int g_walking = false; // Movetype == MOVETYPE_WALK. Filters out noclip, being on ladder, etc.
 }
 /*
 ===============================================================================

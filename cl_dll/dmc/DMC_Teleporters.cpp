@@ -6,6 +6,7 @@
 //=============================================================================
 
 #include "hud.h"
+#include "byteswap.h"	// oldmac: LittleToHostSW
 #include "entity_state.h"
 #include "pm_defs.h"
 #include "pm_shared.h"
@@ -280,6 +281,22 @@ char *Dmc_LoadEntityLump( const char *filename )
 		return NULL;
 	}
 
+	// oldmac: BSP lumps are little-endian on disk and this is the mod's own
+	// reader, so nothing has swapped them. On PowerPC a BSP30 header reads
+	// back as 0x1E000000 and the check below always fires, leaving the
+	// teleporter list empty and killing client-side teleport prediction.
+	// LittleToHostSW is an empty macro on little-endian, so Intel is a no-op.
+	{
+		int lump;
+
+		LittleToHostSW( header.version );
+		for( lump = 0; lump < HEADER_LUMPS; lump++ )
+		{
+			LittleToHostSW( header.lumps[lump].fileofs );
+			LittleToHostSW( header.lumps[lump].filelen );
+		}
+	}
+
 	// Check the version
 	i = header.version;
 	if ( i != 29 && i != 30)
@@ -402,6 +419,14 @@ void Dmc_TeleporterTouched( int numtele, dmc_tele_t *pTeles, dmc_tele_t *pTele, 
 	// Find the target
 	target = Dmc_FindTarget( pTele->target, numtele, pTeles );
 
+	// oldmac: Dmc_FindTarget returns NULL when a trigger_teleport names a
+	// destination this map does not contain, and everything below
+	// dereferences it. Reachable on PowerPC only once the byteswap above
+	// stops the teleporter list coming out empty, which is why the two
+	// changes belong together.
+	if ( !target )
+		return;
+
 	for ( i = 0; i < 3; i++ )
 		player->playerstate.origin[ i ] = target->origin[ i ];
 	
@@ -441,7 +466,15 @@ void Dmc_TouchTeleporters (  struct local_state_s *player, dmc_tele_t *pTeles, i
 	float		pmaxs[ 3 ] = { 13, 13, 32 };
 	vec3_t		LengthVector;
 	int			iTeleNum = 0;
-	
+
+	// oldmac: the server has not described the teleporters yet, so there is
+	// nothing to predict against. Without this the loop below builds every
+	// teleporter a unit box out of the zeroed g_vecTeleMins, which sits at the
+	// world origin, and then tests the player against it. g_iTeleNum is only
+	// ever set by MsgFunc_InitHUD, and it is negative if that message was
+	// truncated, since READ_BYTE returns -1 on a short read. See issue #32.
+	if ( g_iTeleNum <= 0 )
+		return;
 
 	// Determine player's bbox
 	for ( j = 0; j < 3; j++ )
@@ -463,6 +496,17 @@ void Dmc_TouchTeleporters (  struct local_state_s *player, dmc_tele_t *pTeles, i
 		//This comes via an event when the player connects.
 		if ( !g_bLoadedTeles )
 		{
+			// oldmac: iTeleNum counts what THIS side found in the map's entity
+			// lump; g_iTeleNum is how many the SERVER spawned and described.
+			// Nothing makes those equal. The index stays in bounds either way,
+			// but past g_iTeleNum it reads entries the server never filled:
+			// zero on the first map of a session, the previous map's boxes
+			// after that. Leave those teleporters holding the zero box
+			// Dmc_ParseTeleporter memset them to, so the skip below ignores
+			// them instead of matching them somewhere arbitrary.
+			if ( iTeleNum >= g_iTeleNum )
+				continue;
+
 			for( j = 0; j < 3; j++ )
 			{
 				pTele->absmin[ j ] = g_vecTeleMins[ iTeleNum ][ j ] - 1.0f;
@@ -474,6 +518,17 @@ void Dmc_TouchTeleporters (  struct local_state_s *player, dmc_tele_t *pTeles, i
 			if ( iTeleNum == g_iTeleNum )
 				 g_bLoadedTeles = true;	
 		}
+
+		// oldmac: a box nobody filled in. Server-described bounds are padded by
+		// a unit on each side, so their span is at least 2.0 on every axis and
+		// they can never be degenerate, even for a teleporter whose sent mins
+		// and maxs are identical. Only a memset entry reads 0 == 0 on all
+		// three. Matching one of those would teleport the player whenever they
+		// stood over the world origin.
+		if ( pTele->absmin[0] == pTele->absmax[0]
+			&& pTele->absmin[1] == pTele->absmax[1]
+			&& pTele->absmin[2] == pTele->absmax[2] )
+			continue;
 
 		if  (  absmin[0] > pTele->absmax[0]
 			|| absmin[1] > pTele->absmax[1]
