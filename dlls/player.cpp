@@ -72,7 +72,10 @@ TYPEDESCRIPTION	CBasePlayer::m_playerSaveData[] =
 {
 	DEFINE_FIELD( CBasePlayer, m_fNVG, FIELD_BOOLEAN ),
 	DEFINE_FIELD( CBasePlayer, m_fNVGActivated, FIELD_BOOLEAN ),
-	DEFINE_FIELD( CBasePlayer, m_flNVGBattery, FIELD_TIME ),
+	// oldmac: a 0-100 percentage, not a timestamp. FIELD_TIME would have the
+	// save system subtract gpGlobals->time on write and re-add it on read, so
+	// night-vision charge restored as instantly full or instantly flat.
+	DEFINE_FIELD( CBasePlayer, m_flNVGBattery, FIELD_FLOAT ),
 	DEFINE_FIELD( CBasePlayer, m_flNVGUpdate, FIELD_TIME ),
 	DEFINE_FIELD( CBasePlayer, m_flInfraredUpdate, FIELD_TIME ),
 	DEFINE_FIELD( CBasePlayer, m_afButtonLast, FIELD_INTEGER ),

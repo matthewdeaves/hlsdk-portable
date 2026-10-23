@@ -191,7 +191,9 @@ int __MsgFunc_PlayMP3( const char *pszName, int iSize, void *pbuf )
 
 	if( !IsXashFWGS( ))
 	{
-		sprintf( cmd, "mp3 play media/%s\n", pszSound );
+		// oldmac: pszSound is server-supplied via READ_STRING and cmd is a
+		// 64-byte stack buffer, so this was an unbounded write.
+		snprintf( cmd, sizeof( cmd ), "mp3 play media/%s\n", pszSound );
 		gEngfuncs.pfnClientCmd( cmd );
 	}
 	else
