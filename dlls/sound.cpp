@@ -1015,8 +1015,13 @@ void SOUNDTRACKLIST_Init()
 			g_soundtracklist[j].mapname, g_soundtracklist[j].soundfile, &g_soundtracklist[j].loop ) )
 			continue;
 
+		// oldmac: a soundtrack.txt entry with no extension (po_c1m1 rather than
+		// po_c1m1.bsp) makes strchr return NULL, and this runs from GameDLLInit,
+		// so the server died at startup. The player supplies this file, so a
+		// malformed one is a case we have to survive.
 		pos = strchr( g_soundtracklist[j].mapname, '.' );
-		*pos = '\0';
+		if( pos )
+			*pos = '\0';
 
 		j++;
 	}
