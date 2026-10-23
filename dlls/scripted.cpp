@@ -380,7 +380,13 @@ void CCineMonster::PossessEntity( void )
 		{
 			if( FStrEq(STRING( pev->target ), "jan_osprey15" ) )
 			{
-				CCineMonster *pSeq = (CCineMonster*)UTIL_FindEntityByTargetname( NULL, "jan_osprey3" );
+				// oldmac: verify the class before trusting the downcast.
+				// UTIL_FindEntityByTargetname returns any CBaseEntity, and the result
+				// is stored into m_pCine, through which every later virtual call
+				// dispatches. The wrong class here is a wild virtual call.
+				CBaseEntity *pFound = UTIL_FindEntityByTargetname( NULL, "jan_osprey3" );
+				CCineMonster *pSeq = ( pFound && FClassnameIs( pFound->pev, "scripted_sequence" ) )
+				                     ? (CCineMonster *)pFound : NULL;
 				if( pSeq )
 				{
 					pTarget->m_pGoalEnt = pSeq;

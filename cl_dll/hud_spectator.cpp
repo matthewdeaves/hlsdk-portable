@@ -746,7 +746,19 @@ void CHudSpectator::DirectorMessage( int iSize, void *pbuf )
 
 				msg->effect = READ_BYTE();		// effect
 
-				UnpackRGB( (int&)msg->r1, (int&)msg->g1, (int&)msg->b1, READ_LONG() );	// color
+				// oldmac: UnpackRGB stores a full int through each reference, but r1/g1/b1 are
+				// single bytes (engine/cdll_int.h). On little-endian the wanted byte
+				// lands first and the zero spill is overwritten by the stores below,
+				// so it works by accident. On big-endian the 0x00 high byte lands on
+				// the field instead, and director messages render black.
+				{
+					int cr, cg, cb;
+
+					UnpackRGB( cr, cg, cb, READ_LONG() );	// color
+					msg->r1 = (byte)cr;
+					msg->g1 = (byte)cg;
+					msg->b1 = (byte)cb;
+				}
 				msg->r2 = msg->r1;
 				msg->g2 = msg->g1;
 				msg->b2 = msg->b1;
