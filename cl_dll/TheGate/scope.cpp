@@ -26,7 +26,9 @@
 
 static int HUD_IsWidescreen(int iWidth, int iHeight)
 {
-	float ratio = iWidth / iHeight;
+	// oldmac: integer division, so ratio was only ever 0.0 or 1.0 and the
+	// widescreen branch below never fired.
+	float ratio = (float)iWidth / (float)iHeight;
 
 	return (ratio >= 1.77f) ? 1 : 0;
 }

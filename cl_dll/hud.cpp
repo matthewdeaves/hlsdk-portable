@@ -192,12 +192,15 @@ int __MsgFunc_PlayMP3( const char *pszName, int iSize, void *pbuf )
 
 	if( !IsXashFWGS( ))
 	{
-		sprintf( cmd, "mp3 loop sound/mp3/%s\n", pszSound );
+		// oldmac: pszSound comes off the wire and cmd was 64 bytes with a
+		// 21-character prefix, so any name over ~42 characters smashed the stack.
+		snprintf( cmd, sizeof( cmd ), "mp3 loop sound/mp3/%s\n", pszSound );
 		gEngfuncs.pfnClientCmd( cmd );
 	}
 	else
 	{
-		sprintf( cmd, "sound/mp3/%s", pszSound );
+		// oldmac: same wire string, same buffer.
+		snprintf( cmd, sizeof( cmd ), "sound/mp3/%s", pszSound );
 		gEngfuncs.pfnPrimeMusicStream( cmd, 1 );
 	}
 

@@ -44,10 +44,13 @@ void CTriggerCommand::Use( CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TY
 	if( !pActivator || !pActivator->IsPlayer() )
 		return;
 
-	if( !pev->netname )
+	// oldmac: netname is a map keyvalue, so its length is the mapper's choice
+	// and cmd is a 64-byte stack buffer. FStringNull is the correct emptiness
+	// test for a string_t; !pev->netname only catches offset zero.
+	if( FStringNull( pev->netname ) )
 		return;
 
-	sprintf( cmd, "%s\n", STRING( pev->netname ) );
+	snprintf( cmd, sizeof( cmd ), "%s\n", STRING( pev->netname ) );
 	CLIENT_COMMAND( ENT( pActivator->pev ), cmd );
 
 	UTIL_Remove( this );
